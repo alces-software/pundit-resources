@@ -9,6 +9,12 @@ module Pundit
 
       before_save :authorize_create_or_update
       before_remove :authorize_destroy
+      after_create_to_many_link :authorize_can_create_to_many_link
+      after_replace_to_many_links :authorize_can_replace_to_many_links
+      after_replace_to_one_link :authorize_can_replace_to_one_link
+      after_replace_polymorphic_to_one_link :authorize_can_replace_polymorphic_to_one_link
+      after_remove_to_many_link :authorize_can_remove_to_many_link
+      after_remove_to_one_link :authorize_can_remove_to_one_link
     end
 
     module ClassMethods
@@ -65,12 +71,43 @@ module Pundit
       end
     end
 
+    # When authorizing operations on relationships, it is useful to know which
+    # relationships and which records are being changed.  We capture the
+    # arguments given to those methods here and then pass them on to the
+    # policy.
+    [
+      :create_to_many_links,
+      :remove_to_many_link,
+      :remove_to_one_link,
+      :replace_polymorphic_to_one_link,
+      :replace_to_many_links,
+      :replace_to_one_link,
+    ].each do |m|
+      define_method m do |*args|
+        begin
+          @link_operation_details = args
+          super(*args)
+        ensure
+          @link_operation_details = nil
+        end
+      end
+    end
+
     protected
 
     def can(method)
       run_callbacks :policy_authorize do
         context[:policy_used]&.call
         policy.public_send(method)
+      end
+    end
+
+    def can_link(method)
+      run_callbacks :policy_authorize do
+        context[:policy_used]&.call
+        if policy.respond_to?(method)
+          policy.public_send(method, *@link_operation_details[1..-1])
+        end
       end
     end
 
@@ -89,6 +126,36 @@ module Pundit
 
     def authorize_destroy
       not_authorized! :destroy unless can :destroy?
+    end
+
+    def authorize_can_create_to_many_link
+      action = :"create_#{@link_operation_details[0]}_link"
+      not_authorized!(action) unless can_link :"#{action}?"
+    end
+
+    def authorize_can_replace_to_many_links
+      action = :"replace_#{@link_operation_details[0]}_links"
+      not_authorized!(action) unless can_link :"#{action}?"
+    end
+
+    def authorize_can_replace_to_one_link
+      action = :"replace_#{@link_operation_details[0]}_link"
+      not_authorized!(action) unless can_link :"#{action}?"
+    end
+
+    def authorize_can_replace_polymorphic_to_one_link
+      action = :"replace_#{@link_operation_details[0]}_link"
+      not_authorized!(action) unless can_link :"#{action}?"
+    end
+
+    def authorize_can_remove_to_many_link
+      action = :"remove_#{@link_operation_details[0]}_link"
+      not_authorized!(action) unless can_link :"#{action}?"
+    end
+
+    def authorize_can_remove_to_one_link
+      action = :"remove_#{@link_operation_details[0]}_link"
+      not_authorized!(action) unless can_link :"#{action}?"
     end
 
     def records_for(association_name, options={})
