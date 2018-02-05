@@ -20,7 +20,33 @@ module Pundit
         Pundit.policy_scope!(context[:current_user], _model_class)
       end
 
+      def creatable_fields(context)
+        policy = policy(context)
+        if policy.respond_to? :permitted_attributes_for_create
+          policy.permitted_attributes_for_create
+        else
+          policy.permitted_attributes
+        end
+      end
+
+      def updatable_fields(context)
+        policy = policy(context)
+        if policy.respond_to? :permitted_attributes_for_update
+          policy.permitted_attributes_for_update
+        else
+          policy.permitted_attributes
+        end
+      end
+
       private
+
+      def policy(context)
+        # Unfortunately, jsonapi-resources doesn't provide a record to use in
+        # the policy at this point.  We will have to authorize based only on the
+        # account and the model's class.
+        current_user = context && context[:current_user]
+        Pundit.policy!(current_user, _model_class)
+      end
 
       def warn_if_show_defined
         policy_class = Pundit::PolicyFinder.new(_model_class.new).policy!
@@ -28,6 +54,14 @@ module Pundit
           puts "WARN: pundit-resources does not use the show? action."
           puts "      #{policy_class::Scope} will be used instead."
         end
+      end
+    end
+
+    def fetchable_fields
+      if policy.respond_to? :permitted_attributes_for_show
+        policy.permitted_attributes_for_show
+      else
+        policy.permitted_attributes
       end
     end
 
