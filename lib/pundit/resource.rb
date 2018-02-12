@@ -23,7 +23,7 @@ module Pundit
 
         context = options[:context]
         context[:policy_used]&.call
-        Pundit.policy_scope!(context[:current_user], _model_class)
+        Pundit.policy_scope!(pundit_user(context), _model_class)
       end
 
       def creatable_fields(context)
@@ -50,8 +50,11 @@ module Pundit
         # Unfortunately, jsonapi-resources doesn't provide a record to use in
         # the policy at this point.  We will have to authorize based only on the
         # account and the model's class.
-        current_user = context && context[:current_user]
-        Pundit.policy!(current_user, _model_class)
+        Pundit.policy!(pundit_user(context), _model_class)
+      end
+
+      def pundit_user(context)
+        context && context[:current_user]
       end
 
       def warn_if_show_defined
@@ -107,16 +110,18 @@ module Pundit
         context[:policy_used]&.call
         if policy.respond_to?(method)
           policy.public_send(method, *@link_operation_details[1..-1])
+        else
+          false
         end
       end
     end
 
-    def current_user
-      context&.[](:current_user)
+    def pundit_user
+      self.class.pundit_user(context)
     end
 
     def policy
-      Pundit.policy!(current_user, _model)
+      Pundit.policy!(pundit_user, _model)
     end
 
     def authorize_create_or_update
@@ -174,7 +179,7 @@ module Pundit
       when JSONAPI::Relationship::ToMany
         records = _model.public_send(association_name)
         policy_scope = Pundit.policy_scope!(
-          context[:current_user],
+          pundit_user,
           records
         )
         records.merge(policy_scope)
@@ -183,7 +188,7 @@ module Pundit
 
         # Don't rely on policy.show? being defined since it isn't used for
         # show actions directly and should always have the same behaviour.
-        if record && show?(Pundit.policy!(context[:current_user], record), record.id)
+        if record && show?(Pundit.policy!(pundit_user, record), record.id)
           record
         else
           nil
