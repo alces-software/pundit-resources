@@ -31,7 +31,7 @@ module Pundit
         if policy.respond_to? :permitted_attributes_for_create
           policy.permitted_attributes_for_create
         else
-          policy.permitted_attributes
+          []
         end
       end
 
@@ -40,7 +40,7 @@ module Pundit
         if policy.respond_to? :permitted_attributes_for_update
           policy.permitted_attributes_for_update
         else
-          policy.permitted_attributes
+          []
         end
       end
 
@@ -70,7 +70,7 @@ module Pundit
       if policy.respond_to? :permitted_attributes_for_show
         policy.permitted_attributes_for_show
       else
-        policy.permitted_attributes
+        []
       end
     end
 
